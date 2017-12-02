@@ -1,3 +1,5 @@
+# Script to automate sending deauth packets
+
 # First get router MAC Address on any local network
 cmd1=($(ip route | grep default))
 IPAddr=${cmd1[2]}
