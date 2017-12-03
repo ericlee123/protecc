@@ -11,3 +11,7 @@ CS378 Ethical Hacking Project
 	- ??? more ???
 3. counter
 	- spam deauth packets as DDoS attack
+
+## Prerequisites
+- (netaddr)[https://github.com/drkjam/netaddr]
+- (scapy)[https://github.com/secdev/scapy]
