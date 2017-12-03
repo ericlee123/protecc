@@ -10,8 +10,8 @@ class Protecc:
         macAddress = "ac:37:43:a3:fd:6f"
         ip = "192.168.1.7"
         sniffTime = 60
-        # self.setMonitorMode(self.interface)
-        # self.nmap(ip)
+        self.setMonitorMode(self.interface)
+        self.nmap(ip)
         self.sniffProbeRequests(macAddress, sniffTime)
 
     def setMonitorMode(self, interface):
