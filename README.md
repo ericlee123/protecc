@@ -13,5 +13,5 @@ CS378 Ethical Hacking Project
 	- spam deauth packets as DDoS attack
 
 ## Prerequisites
-- (netaddr)[https://github.com/drkjam/netaddr]
-- (scapy)[https://github.com/secdev/scapy]
+- [netaddr](https://github.com/drkjam/netaddr)
+- [scapy](https://github.com/secdev/scapy)
