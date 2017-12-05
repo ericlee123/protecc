@@ -10,6 +10,7 @@ class Protecc:
         macAddress = "ac:37:43:a3:fd:6f"
         ip = "192.168.1.7"
         sniffTime = 60
+        routerMAC = self.findRouterMAC()
         self.setMonitorMode(self.interface)
         self.nmap(ip)
         self.sniffProbeRequests(macAddress, sniffTime)
@@ -18,6 +19,15 @@ class Protecc:
         subprocess.run(["ifconfig", interface, "down"])
         subprocess.run(["iwconfig", interface, "mode", "monitor"])
         subprocess.run(["ifconfig", interface, "up"])
+
+    def findRouterMAC(self):
+        out = subprocess.check_output("ip route | grep default", shell=True)
+        ip = out.split()[2].decode('utf-8')
+        mac = subprocess.check_output("arp -a | grep '(" + str(ip) + ")'", shell=True)
+        return mac.split()[3].decode('utf-8')
+
+    def sendDeauthPackets(self, count, routerMAC, attackerMAC, interface):
+        subprocess.run(["aireplay-ng", "-0", str(count), "-a", routerMAC, "-c", attackerMAC, interface])
 
     def nmap(self, ip):
         subprocess.run(["nmap", "-A", "-oN", "nmap-"+ip+".log", ip])
