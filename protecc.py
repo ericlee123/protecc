@@ -45,13 +45,12 @@ class Protecc:
         # macAddress = "10:08:b1:6f:ef:bb" # robert
         # macAddress = "b8:e8:56:44:59:c4" # maurya
 
-        print("defending")
-        # self.setMonitorMode()
-        # routerMAC = self.findRouterMAC()
-        # self.logNmap(attackerIP)
-        # thread = threading.Thread(target=self.spamDeauthPackets, args=[1, routerMAC, attackerMAC, self.monitor])
-        # thread.start()
-        # self.sniffProbeRequests(attackerMAC, self.sniffTime)
+        self.setMonitorMode()
+        routerMAC = self.findRouterMAC()
+        self.logNmap(attackerIP)
+        thread = threading.Thread(target=self.spamDeauthPackets, args=[1, routerMAC, attackerMAC, self.monitor])
+        thread.start()
+        self.sniffProbeRequests(attackerMAC, self.sniffTime)
 
     def getInterfaceIP(self, interface):
         return netifaces.ifaddresses(interface)[netifaces.AF_INET][0]['addr']
@@ -93,9 +92,13 @@ def main():
     parser.add_argument("-w", "--whitelist", help="MAC address whitelist (newline separated)")
     args = parser.parse_args()
 
-    # if not args.monitoring-interface:
-    #     print("ERROR: pls provide monitor supported interface")
-    #     sys.exit(-1)
+    if not args.internet-interface:
+        print("ERROR: pls provide internet interface")
+        sys.exit(-1)
+
+    if not args.monitoring-interface:
+        print("ERROR: pls provide monitor supported interface")
+        sys.exit(-1)
 
     p = Protecc(args.internet_interface, args.monitoring_interface, args.sniffTime, args.whitelist)
 
