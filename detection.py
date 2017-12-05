@@ -44,7 +44,7 @@ def printTest(pkt):
             print("\n--- A network error occurred making the network or host unreachable.")
             exit()
 
-        print("my ip is " + myip)
+        #print("my ip is " + myip)
         #print(pkt.summary())
         #print("\nsrc ip: " + pkt[IP].src + " port: " + str(pkt[TCP].sport))
         #print("dst ip: " + pkt[IP].dst + " port: " + str(pkt[TCP].dport))

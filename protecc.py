@@ -1,4 +1,6 @@
 import argparse
+import logging
+logging.getLogger("scapy.runtime").setLevel(logging.ERROR)
 import netifaces
 import os
 from scapy.all import *
