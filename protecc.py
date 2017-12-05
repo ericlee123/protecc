@@ -2,7 +2,6 @@ import argparse
 import logging
 import netifaces
 import os
-from scapy.all import *
 import socket
 import subprocess
 import sys
@@ -11,6 +10,7 @@ import time
 
 # to suppress IPv6 warnings
 logging.getLogger("scapy.runtime").setLevel(logging.ERROR)
+from scapy.all import *
 
 class Protecc:
 
