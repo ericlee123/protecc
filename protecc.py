@@ -20,7 +20,7 @@ class Protecc:
         # load whitelist
         wl = open(whitelist, "r")
         self.whitelist = wl.readlines()
-        print wl
+        print(wl)
 
     def receivePacket(self, pkt):
         if IP in pkt:
