@@ -3,7 +3,7 @@
 # First get router MAC Address on any local network
 cmd1=($(ip route | grep default))
 IPAddr=${cmd1[2]}
-cmd2=($(arp -a | grep $IPAddr))
+cmd2=($(arp -a | grep gateway))
 MACAddr=${cmd2[3]}
 echo $MACAddr
 
