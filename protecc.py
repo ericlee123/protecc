@@ -23,7 +23,7 @@ class Protecc:
         self.blacklist = set()
 
         # load whitelist
-        self.whitelist = None
+        self.whitelist = []
         if whitelist is not None:
             wl = open(whitelist, "r")
             self.whitelist = wl.read().splitlines()
