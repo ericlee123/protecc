@@ -14,6 +14,7 @@ import tkinter.scrolledtext as tkst
 logging.getLogger("scapy.runtime").setLevel(logging.ERROR)
 from scapy.all import *
 
+# live output window
 win = tk.Tk()
 win.title("Packet Viewer")
 win.minsize(450, 250)
@@ -85,8 +86,6 @@ class Protecc:
                     if len(self.incomingMACs[srcMAC]) > 100:
                         if srcIP.startswith(subnetCheck):
                             print("potential nmap scan over the local network from " + srcIP + " (" + srcMAC + "); counterattacking")
-                            location = subprocess.check_output(["geoiplookup", srcIP])
-                            print(location)
                         else:
                             print("potential nmap scan over the internet from " + srcIP + " (" + srcMAC + "); counterattacking")
                             location = subprocess.getoutput(["geoiplookup", srcIP]).decode('utf-8')
@@ -104,12 +103,14 @@ class Protecc:
 
                         self.blacklist.add(srcMAC)
                         self.defend(srcMAC, srcIP)
+                if srcMAC in self.whitelist:
+                    print("whitelisted MAC address (" + srcMAC + ") doing suspicious things...")
 
     def defend(self, attackerMAC, attackerIP):
         self.setMonitorMode()
         routerMAC = self.findRouterMAC()
         self.logNmap(attackerIP)
-        thread = threading.Thread(target=self.spamDeauthPackets, args=[64, routerMAC, attackerMAC, self.monitor])
+        thread = threading.Thread(target=self.spamDeauthPackets, args=[10, routerMAC, attackerMAC, self.monitor])
         thread.start()
         self.sniffProbeRequests(attackerMAC, self.sniffTime)
 
@@ -128,11 +129,12 @@ class Protecc:
         return mac.split()[3].decode('utf-8')
 
     def spamDeauthPackets(self, count, routerMAC, attackerMAC, interface):
-        while True:
+        for i in range(5):
             subprocess.run(["aireplay-ng", "-0", str(count), "-a", routerMAC, "-c", attackerMAC, interface])
+            time.sleep(0.1)
 
     def logNmap(self, ip):
-        subprocess.run(["nmap", "-O", "-oN", self.outputFolder + "/nmap-" + ip + ".log", ip])
+        subprocess.run(["nmap", "-F", "-O", "-oN", self.outputFolder + "/nmap-" + ip + ".log", ip])
 
     def sniffProbeRequests(self, macAddress, sniffTime):
         subprocess.run("timeout " + str(sniffTime) + "s " \
@@ -163,8 +165,10 @@ def main():
         sys.exit(-1)
 
     p = Protecc(args.internet_interface, args.monitoring_interface, args.sniff_time, args.whitelist, args.output_folder)
+    # p.defend(sampleMAC, sampleIP)
 
     thread = threading.Thread(target=doSniff, args=[args.internet_interface, p])
+    thread.daemon = True
     thread.start()
     win.mainloop()
 
