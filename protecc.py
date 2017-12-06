@@ -92,11 +92,17 @@ class Protecc:
 
                         self.blacklist.add(srcMAC)
                         self.defend(srcMAC, srcIP)
-                    elif self.incomingMACs[srcMAC][dstPort] > 100:
+                    elif self.incomingMACs[srcMAC][dstPort] > 100 and dstPort != 80 and dstPort != 443:
                         if srcIP.startswith(subnetCheck):
-                            print("brute force detected over the local network from " + srcIP + " (" + srcMAC + "); counterattacking")
+                            print("brute force detected over the local network from " + srcIP + " (" + srcMAC + ")")
+                            if dstPort == 22:
+                                print("brute force is on SSH service!")
+                            print("counterattacking")
                         else:
-                            print("brute force detected over the internet from " + srcIP + " (" + srcMAC + "); counterattacking")
+                            print("brute force detected over the internet from " + srcIP + " (" + srcMAC + ")")
+                            if dstPort == 22:
+                                print("brute force is on SSH service!")
+                            print("counterattacking")
                             location = subprocess.check_output(["geoiplookup", srcIP]).decode('utf-8')
                             print(location)
 
