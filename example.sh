@@ -1,2 +1,2 @@
 #!/bin/bash
-sudo python3 protecc.py -i wlp58s0 -m wlx00c0ca96a8d6 -s 30 -w whitelist.txt
+sudo python3 protecc.py -i wlp58s0 -m wlan0mon -s 30 -w whitelist.txt

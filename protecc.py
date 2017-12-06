@@ -65,13 +65,10 @@ class Protecc:
                         self.defend(srcMAC, srcIP)
 
     def defend(self, attackerMAC, attackerIP):
-        # macAddress = "ac:37:43:a3:fd:6f" # eric phone
-        # macAddress = "10:08:b1:6f:ef:bb" # robert
-        # macAddress = "b8:e8:56:44:59:c4" # maurya
         self.setMonitorMode()
         routerMAC = self.findRouterMAC()
         self.logNmap(attackerIP)
-        thread = threading.Thread(target=self.spamDeauthPackets, args=[1, routerMAC, attackerMAC, self.monitor])
+        thread = threading.Thread(target=self.spamDeauthPackets, args=[64, routerMAC, attackerMAC, self.monitor])
         thread.start()
         self.sniffProbeRequests(attackerMAC, self.sniffTime)
 
@@ -92,10 +89,9 @@ class Protecc:
     def spamDeauthPackets(self, count, routerMAC, attackerMAC, interface):
         while True:
             subprocess.run(["aireplay-ng", "-0", str(count), "-a", routerMAC, "-c", attackerMAC, interface])
-            time.sleep(1)
 
     def logNmap(self, ip):
-        subprocess.run(["nmap", "-A", "-oN", self.outputFolder + "/nmap-" + ip + ".log", ip])
+        subprocess.run(["nmap", "-O", "-oN", self.outputFolder + "/nmap-" + ip + ".log", ip])
 
     def sniffProbeRequests(self, macAddress, sniffTime):
         subprocess.run("timeout " + str(sniffTime) + "s " \
