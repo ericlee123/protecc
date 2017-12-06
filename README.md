@@ -1,5 +1,6 @@
 # protecc
 CS378 Ethical Hacking Project
+
 Maurya Avirneni, Eric Lee, Alex Ng, Robert Monetfusco
 
 ## Synopsis 
