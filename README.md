@@ -15,3 +15,4 @@ CS378 Ethical Hacking Project
 ## Prerequisites
 - [netaddr](https://github.com/drkjam/netaddr)
 - [scapy](https://github.com/secdev/scapy)
+- [geoip](https://packages.debian.org/wheezy/geoip-bin)

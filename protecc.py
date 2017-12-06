@@ -85,8 +85,6 @@ class Protecc:
                     if len(self.incomingMACs[srcMAC]) > 100:
                         if srcIP.startswith(subnetCheck):
                             print("potential nmap scan over the local network from " + srcIP + " (" + srcMAC + "); counterattacking")
-                            location = subprocess.check_output(["geoiplookup", srcIP])
-                            print(location)
                         else:
                             print("potential nmap scan over the internet from " + srcIP + " (" + srcMAC + "); counterattacking")
                             location = subprocess.getoutput(["geoiplookup", srcIP]).decode('utf-8')
