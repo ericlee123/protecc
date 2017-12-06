@@ -10,6 +10,14 @@ import time
 import tkinter as tk
 import tkinter.scrolledtext as tkst
 
+# Import smtplib for the actual sending function
+import smtplib
+import os
+import sys
+# Import the email modules we'll need
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+
 # to suppress IPv6 warnings
 logging.getLogger("scapy.runtime").setLevel(logging.ERROR)
 from scapy.all import *
@@ -59,16 +67,18 @@ class Protecc:
                 # TODO: also track UDP
                 if TCP in pkt:
                     dstPort = pkt[TCP].dport
+                    srcPort = pkt[TCP].sport
                 else:
                     return
 
-                global count
-                output = "Packet #" + str(count) + " source ip is " + str(srcIP) + " going to port " + str(dstPort)
-                editArea.configure(state="normal")
-                editArea.insert(tk.INSERT, output + "\n")
-                editArea.yview(tk.END)
-                editArea.configure(state="disabled")
-                count += 1
+                if srcPort != 80 and srcPort != 443:
+                    global count
+                    output = "Packet #" + str(count) + " source ip is " + str(srcIP) + " going to port " + str(dstPort)
+                    editArea.configure(state="normal")
+                    editArea.insert(tk.INSERT, output + "\n")
+                    editArea.yview(tk.END)
+                    editArea.configure(state="disabled")
+                    count += 1
 
                 if srcMAC not in self.incomingMACs:
                     self.incomingMACs[srcMAC] = {}
@@ -82,24 +92,38 @@ class Protecc:
                 secondDotIndex = selfIP.index(".", firstDotIndex + 1)
                 subnetCheck = selfIP[:secondDotIndex]
 
-                if srcMAC not in self.blacklist and srcMAC not in self.whitelist:
+                if srcMAC not in self.blacklist and srcMAC not in self.whitelist and srcPort != 80 and srcPort != 443:
                     if len(self.incomingMACs[srcMAC]) > 100:
                         if srcIP.startswith(subnetCheck):
-                            print("potential nmap scan over the local network from " + srcIP + " (" + srcMAC + "); counterattacking")
+                            print("potential nmap scan over the local network from " + srcIP + " (" + srcMAC + ")\ncounterattacking")
+                            print("sending email to admin with this information...")
+                            self.sendEmail("nmap", "potential nmap scan over the local network from " + srcIP + " (" + srcMAC + ")")
                         else:
-                            print("potential nmap scan over the internet from " + srcIP + " (" + srcMAC + "); counterattacking")
-                            location = subprocess.getoutput(["geoiplookup", srcIP]).decode('utf-8')
+                            print("potential nmap scan over the internet from " + srcIP + " (" + srcMAC + ")\ncounterattacking")
+                            location = subprocess.check_output(["geoiplookup", srcIP]).decode('utf-8')
                             print(location)
+                            print("sending email to admin with this information...")
+                            self.sendEmail("nmap", "potential nmap scan over the internet from " + srcIP + " (" + srcMAC + ")\n{}".format(location))
 
                         self.blacklist.add(srcMAC)
                         self.defend(srcMAC, srcIP)
-                    elif self.incomingMACs[srcMAC][dstPort] > 100:
+                    elif self.incomingMACs[srcMAC][dstPort] > 100 and dstPort != 80 and dstPort != 443:
                         if srcIP.startswith(subnetCheck):
-                            print("brute force detected over the local network from " + srcIP + " (" + srcMAC + "); counterattacking")
+                            print("brute force detected over the local network from " + srcIP + " (" + srcMAC + ")")
+                            if dstPort == 22:
+                                print("brute force is on SSH service!")
+                            print("counterattacking")
+                            print("sending email to admin with this information...")
+                            self.sendEmail("brute force", "potential brute force over the local network from " + srcIP + " (" + srcMAC + ")")
                         else:
-                            print("brute force detected over the internet from " + srcIP + " (" + srcMAC + "); counterattacking")
-                            location = subprocess.check_output(["geoiplookup", srcIP])
+                            print("brute force detected over the internet from " + srcIP + " (" + srcMAC + ")")
+                            if dstPort == 22:
+                                print("brute force is on SSH service!")
+                            print("counterattacking")
+                            location = subprocess.check_output(["geoiplookup", srcIP]).decode('utf-8')
                             print(location)
+                            print("sending email to admin with this information...")
+                            self.sendEmail("brute force", "potential brute force over the internet from " + srcIP + " (" + srcMAC + ")\n{}".format(location))
 
                         self.blacklist.add(srcMAC)
                         self.defend(srcMAC, srcIP)
@@ -141,6 +165,18 @@ class Protecc:
                        "python probemon.py -i " + self.monitor + " -o " + self.outputFolder + "/sneaks-" + macAddress + ".log -t unix -fsrl | " \
                        "grep --line-buffered " + macAddress + " > " + self.outputFolder + "/filteredSneaks-" + macAddress + ".log", shell=True)
         print("probe sniffing on " + macAddress + " completed")
+
+    def sendEmail(self, type, warning):
+        # login to gmail
+        server = smtplib.SMTP('smtp.gmail.com', 587)
+        server.starttls()
+        server.login("haccingprotecctor@gmail.com", "ishallprotecc")
+
+        msg = 'Subject: {}\n\n{}'.format("ALERT: {}".format(type), warning)
+
+        # for now, sending email to myself
+        server.sendmail("haccingprotecctor@gmail.com", "haccingprotecctor@gmail.com", msg)
+        server.quit()
 
 DESCRIPTION = "Automated counter attack service for public wifi"
 
