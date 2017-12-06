@@ -2,18 +2,31 @@ import argparse
 import logging
 import netifaces
 import os
-from scapy.all import *
 import socket
 import subprocess
 import sys
 import threading
 import time
+import tkinter as tk
+import tkinter.scrolledtext as tkst
 
 # to suppress IPv6 warnings
 logging.getLogger("scapy.runtime").setLevel(logging.ERROR)
+from scapy.all import *
+
+win = tk.Tk()
+win.title("Packet Viewer")
+win.minsize(450, 250)
+frame1 = tk.Frame(master = win, bg = '#FFFFFF')
+frame1.pack(fill='both', expand='yes')
+
+editArea = tkst.ScrolledText(master = frame1, wrap = tk.WORD, width = 90, height = 40)
+editArea.pack(padx=0, pady=0, fill=tk.BOTH, expand=True)
+editArea.insert(tk.INSERT, "")
+editArea.configure(state = "disabled")
+count = 1
 
 class Protecc:
-
     def __init__(self, internet, monitor, sniffTime, whitelist, outputFolder):
         self.internet = internet
         self.monitor = monitor
@@ -36,8 +49,10 @@ class Protecc:
             self.outputFolder = outputFolder
 
     def receivePacket(self, pkt):
+        selfIP = self.getInterfaceIP(self.internet)
+
         if IP in pkt:
-            if pkt[IP].dst == self.getInterfaceIP(self.internet):
+            if pkt[IP].dst == selfIP:
                 srcIP = pkt[IP].src
                 srcMAC = pkt[Ether].src
                 # TODO: also track UDP
@@ -45,6 +60,14 @@ class Protecc:
                     dstPort = pkt[TCP].dport
                 else:
                     return
+
+                global count
+                output = "Packet #" + str(count) + " source ip is " + str(srcIP) + " going to port " + str(dstPort)
+                editArea.configure(state="normal")
+                editArea.insert(tk.INSERT, output + "\n")
+                editArea.yview(tk.END)
+                editArea.configure(state="disabled")
+                count += 1
 
                 if srcMAC not in self.incomingMACs:
                     self.incomingMACs[srcMAC] = {}
@@ -54,13 +77,31 @@ class Protecc:
                         self.incomingMACs[srcMAC][dstPort] = 0
                     self.incomingMACs[srcMAC][dstPort] += 1
 
+                firstDotIndex = selfIP.index(".")
+                secondDotIndex = selfIP.index(".", firstDotIndex + 1)
+                subnetCheck = selfIP[:secondDotIndex]
+
                 if srcMAC not in self.blacklist and srcMAC not in self.whitelist:
                     if len(self.incomingMACs[srcMAC]) > 100:
-                        print("potential nmap scan from " + srcIP + " (" + srcMAC + "); counterattacking")
+                        if srcIP.startswith(subnetCheck):
+                            print("potential nmap scan over the local network from " + srcIP + " (" + srcMAC + "); counterattacking")
+                            location = subprocess.check_output(["geoiplookup", srcIP])
+                            print(location)
+                        else:
+                            print("potential nmap scan over the internet from " + srcIP + " (" + srcMAC + "); counterattacking")
+                            location = subprocess.getoutput(["geoiplookup", srcIP]).decode('utf-8')
+                            print(location)
+
                         self.blacklist.add(srcMAC)
                         self.defend(srcMAC, srcIP)
                     elif self.incomingMACs[srcMAC][dstPort] > 100:
-                        print("brute force detected from " + srcIP + " (" + srcMAC + "); counterattacking")
+                        if srcIP.startswith(subnetCheck):
+                            print("brute force detected over the local network from " + srcIP + " (" + srcMAC + "); counterattacking")
+                        else:
+                            print("brute force detected over the internet from " + srcIP + " (" + srcMAC + "); counterattacking")
+                            location = subprocess.check_output(["geoiplookup", srcIP])
+                            print(location)
+
                         self.blacklist.add(srcMAC)
                         self.defend(srcMAC, srcIP)
 
@@ -125,6 +166,7 @@ def main():
 
     thread = threading.Thread(target=doSniff, args=[args.internet_interface, p])
     thread.start()
+    win.mainloop()
 
 
 if __name__ == "__main__":
