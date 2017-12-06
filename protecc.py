@@ -87,7 +87,7 @@ class Protecc:
                             print("potential nmap scan over the local network from " + srcIP + " (" + srcMAC + "); counterattacking")
                         else:
                             print("potential nmap scan over the internet from " + srcIP + " (" + srcMAC + "); counterattacking")
-                            location = subprocess.getoutput(["geoiplookup", srcIP]).decode('utf-8')
+                            location = subprocess.check_output(["geoiplookup", srcIP]).decode('utf-8')
                             print(location)
 
                         self.blacklist.add(srcMAC)
@@ -97,7 +97,7 @@ class Protecc:
                             print("brute force detected over the local network from " + srcIP + " (" + srcMAC + "); counterattacking")
                         else:
                             print("brute force detected over the internet from " + srcIP + " (" + srcMAC + "); counterattacking")
-                            location = subprocess.check_output(["geoiplookup", srcIP])
+                            location = subprocess.check_output(["geoiplookup", srcIP]).decode('utf-8')
                             print(location)
 
                         self.blacklist.add(srcMAC)
