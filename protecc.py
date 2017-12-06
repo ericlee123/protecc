@@ -22,7 +22,6 @@ from email.mime.text import MIMEText
 logging.getLogger("scapy.runtime").setLevel(logging.ERROR)
 from scapy.all import *
 
-# live output window
 win = tk.Tk()
 win.title("Packet Viewer")
 win.minsize(450, 250)
@@ -71,7 +70,7 @@ class Protecc:
                 else:
                     return
 
-                if srcPort != 80 and srcPort != 443:
+                if srcPort != 80 and srcPort != 443: #Don't show http/https traffic
                     global count
                     output = "Packet #" + str(count) + " source ip is " + str(srcIP) + " going to port " + str(dstPort)
                     editArea.configure(state="normal")
@@ -106,7 +105,12 @@ class Protecc:
                             self.sendEmail("nmap", "potential nmap scan over the internet from " + srcIP + " (" + srcMAC + ")\n{}".format(location))
 
                         self.blacklist.add(srcMAC)
-                        self.defend(srcMAC, srcIP)
+                        if srcIP.startswith(subnetCheck):
+                            self.defend(srcMAC, srcIP)
+                        else:
+                            iptable = subprocess.check_output(["iptables", "-A", "INPUT", "-s", srcIP, "-j", "DROP"]).decode('utf-8')
+                            if iptable == "":
+                                print("Blocked external IP " + srcIP + " with iptables")
                     elif self.incomingMACs[srcMAC][dstPort] > 100 and dstPort != 80 and dstPort != 443:
                         if srcIP.startswith(subnetCheck):
                             print("brute force detected over the local network from " + srcIP + " (" + srcMAC + ")")
@@ -126,15 +130,21 @@ class Protecc:
                             self.sendEmail("brute force", "potential brute force over the internet from " + srcIP + " (" + srcMAC + ")\n{}".format(location))
 
                         self.blacklist.add(srcMAC)
-                        self.defend(srcMAC, srcIP)
-                if srcMAC in self.whitelist:
-                    print("whitelisted MAC address (" + srcMAC + ") doing suspicious things...")
+                        if srcIP.startswith(subnetCheck):
+                            self.defend(srcMAC, srcIP)
+                        else:
+                            iptable = subprocess.check_output(["iptables", "-A", "INPUT", "-s", srcIP, "-j", "DROP"]).decode('utf-8')
+                            if iptable == "":
+                                print("Blocked external IP " + srcIP + " with iptables")
 
     def defend(self, attackerMAC, attackerIP):
+        # macAddress = "ac:37:43:a3:fd:6f" # eric phone
+        # macAddress = "10:08:b1:6f:ef:bb" # robert
+        # macAddress = "b8:e8:56:44:59:c4" # maurya
         self.setMonitorMode()
         routerMAC = self.findRouterMAC()
         self.logNmap(attackerIP)
-        thread = threading.Thread(target=self.spamDeauthPackets, args=[10, routerMAC, attackerMAC, self.monitor])
+        thread = threading.Thread(target=self.spamDeauthPackets, args=[1, routerMAC, attackerMAC, self.monitor])
         thread.start()
         self.sniffProbeRequests(attackerMAC, self.sniffTime)
 
@@ -153,12 +163,12 @@ class Protecc:
         return mac.split()[3].decode('utf-8')
 
     def spamDeauthPackets(self, count, routerMAC, attackerMAC, interface):
-        for i in range(5):
+        while True:
             subprocess.run(["aireplay-ng", "-0", str(count), "-a", routerMAC, "-c", attackerMAC, interface])
-            time.sleep(0.1)
+            time.sleep(1)
 
     def logNmap(self, ip):
-        subprocess.run(["nmap", "-F", "-O", "-oN", self.outputFolder + "/nmap-" + ip + ".log", ip])
+        subprocess.run(["nmap", "-A", "-oN", self.outputFolder + "/nmap-" + ip + ".log", ip])
 
     def sniffProbeRequests(self, macAddress, sniffTime):
         subprocess.run("timeout " + str(sniffTime) + "s " \
@@ -201,10 +211,8 @@ def main():
         sys.exit(-1)
 
     p = Protecc(args.internet_interface, args.monitoring_interface, args.sniff_time, args.whitelist, args.output_folder)
-    # p.defend(sampleMAC, sampleIP)
 
     thread = threading.Thread(target=doSniff, args=[args.internet_interface, p])
-    thread.daemon = True
     thread.start()
     win.mainloop()
 
