@@ -125,9 +125,6 @@ class Protecc:
         subprocess.run(["ifconfig", self.monitor, "up"])
 
     def findRouterMAC(self):
-        while 1:
-            pass
-
         out = subprocess.check_output("ip route | grep default", shell=True)
         ip = out.split()[2].decode('utf-8')
         mac = subprocess.check_output("arp -a | grep '(" + str(ip) + ")'", shell=True)
