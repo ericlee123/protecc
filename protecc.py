@@ -7,8 +7,6 @@ import subprocess
 import sys
 import threading
 import time
-import tkinter as tk
-import tkinter.scrolledtext as tkst
 
 # Import smtplib for the actual sending function
 import smtplib
@@ -21,18 +19,6 @@ from email.mime.text import MIMEText
 # to suppress IPv6 warnings
 logging.getLogger("scapy.runtime").setLevel(logging.ERROR)
 from scapy.all import *
-
-win = tk.Tk()
-win.title("Packet Viewer")
-win.minsize(450, 250)
-frame1 = tk.Frame(master = win, bg = '#FFFFFF')
-frame1.pack(fill='both', expand='yes')
-
-editArea = tkst.ScrolledText(master = frame1, wrap = tk.WORD, width = 90, height = 40)
-editArea.pack(padx=0, pady=0, fill=tk.BOTH, expand=True)
-editArea.insert(tk.INSERT, "")
-editArea.configure(state = "disabled")
-count = 1
 
 class Protecc:
     def __init__(self, internet, monitor, sniffTime, whitelist, outputFolder):
@@ -60,91 +46,65 @@ class Protecc:
         selfIP = self.getInterfaceIP(self.internet)
 
         if IP in pkt:
+            # TODO: detect attacks not necessarily directed at my computer
             if pkt[IP].dst == selfIP:
                 srcIP = pkt[IP].src
                 srcMAC = pkt[Ether].src
+
                 # TODO: also track UDP
                 if TCP in pkt:
-                    dstPort = pkt[TCP].dport
                     srcPort = pkt[TCP].sport
+                    dstPort = pkt[TCP].dport
                 else:
                     return
 
-                if srcPort != 80 and srcPort != 443: #Don't show http/https traffic
-                    global count
-                    output = "Packet #" + str(count) + " source ip is " + str(srcIP) + " going to port " + str(dstPort)
-                    editArea.configure(state="normal")
-                    editArea.insert(tk.INSERT, output + "\n")
-                    editArea.yview(tk.END)
-                    editArea.configure(state="disabled")
-                    count += 1
+                if srcMAC not in self.blacklist and srcMAC not in self.whitelist:
 
-                if srcMAC not in self.incomingMACs:
-                    self.incomingMACs[srcMAC] = {}
-                    self.incomingMACs[srcMAC][dstPort] = 1
-                else:
-                    if dstPort not in self.incomingMACs[srcMAC]:
-                        self.incomingMACs[srcMAC][dstPort] = 0
-                    self.incomingMACs[srcMAC][dstPort] += 1
+                    # count it
+                    if srcMAC not in self.incomingMACs:
+                        self.incomingMACs[srcMAC] = {}
+                        self.incomingMACs[srcMAC][dstPort] = 1
+                    else:
+                        if dstPort not in self.incomingMACs[srcMAC]:
+                            self.incomingMACs[srcMAC][dstPort] = 0
+                        self.incomingMACs[srcMAC][dstPort] += 1
 
-                firstDotIndex = selfIP.index(".")
-                secondDotIndex = selfIP.index(".", firstDotIndex + 1)
-                subnetCheck = selfIP[:secondDotIndex]
+                    firstDotIndex = selfIP.index(".")
+                    secondDotIndex = selfIP.index(".", firstDotIndex + 1)
+                    subnetCheck = selfIP[:secondDotIndex]
+                    local = srcIP.startswith(subnetCheck)
 
-                if srcMAC not in self.blacklist and srcMAC not in self.whitelist and srcPort != 80 and srcPort != 443:
-                    if len(self.incomingMACs[srcMAC]) > 100:
-                        if srcIP.startswith(subnetCheck):
-                            print("potential nmap scan over the local network from " + srcIP + " (" + srcMAC + ")\ncounterattacking")
-                            print("sending email to admin with this information...")
-                            self.sendEmail("nmap", "potential nmap scan over the local network from " + srcIP + " (" + srcMAC + ")")
-                        else:
-                            print("potential nmap scan over the internet from " + srcIP + " (" + srcMAC + ")\ncounterattacking")
-                            location = subprocess.check_output(["geoiplookup", srcIP]).decode('utf-8')
-                            print(location)
-                            print("sending email to admin with this information...")
-                            self.sendEmail("nmap", "potential nmap scan over the internet from " + srcIP + " (" + srcMAC + ")\n{}".format(location))
-
-                        self.blacklist.add(srcMAC)
-                        if srcIP.startswith(subnetCheck):
+                    if len(self.incomingMACs[srcMAC]) > 100: # maybe nmap
+                        print("===========================================")
+                        if local: # true if traffic is from local network
+                            print("potential nmap scan over the local network from " + srcIP + " (" + srcMAC + ")")
+                            print("doing the protecc...")
                             self.defend(srcMAC, srcIP)
                         else:
-                            iptable = subprocess.check_output(["iptables", "-A", "INPUT", "-s", srcIP, "-j", "DROP"]).decode('utf-8')
-                            if iptable == "":
-                                print("Blocked external IP " + srcIP + " with iptables")
-                    elif self.incomingMACs[srcMAC][dstPort] > 100 and dstPort != 80 and dstPort != 443:
-                        if srcIP.startswith(subnetCheck):
-                            print("brute force detected over the local network from " + srcIP + " (" + srcMAC + ")")
-                            if dstPort == 22:
-                                print("brute force is on SSH service!")
-                            print("counterattacking")
-                            print("sending email to admin with this information...")
-                            self.sendEmail("brute force", "potential brute force over the local network from " + srcIP + " (" + srcMAC + ")")
-                        else:
-                            print("brute force detected over the internet from " + srcIP + " (" + srcMAC + ")")
-                            if dstPort == 22:
-                                print("brute force is on SSH service!")
-                            print("counterattacking")
+                            print("potential nmap scan over the internet from " + srcIP + " (" + srcMAC + ")")
                             location = subprocess.check_output(["geoiplookup", srcIP]).decode('utf-8')
-                            print(location)
-                            print("sending email to admin with this information...")
-                            self.sendEmail("brute force", "potential brute force over the internet from " + srcIP + " (" + srcMAC + ")\n{}".format(location))
-
+                            print("traffic coming from " + location)
+                            self.blockIP(srcIP)
                         self.blacklist.add(srcMAC)
-                        if srcIP.startswith(subnetCheck):
+
+                    elif self.incomingMACs[srcMAC][dstPort] > 100: # maybe brute force
+                        print("===========================================")
+                        if local:
+                            print("potential brute force attack detected over the local network from " + srcIP + " (" + srcMAC + ")")
+                            print("doing the protecc...")
                             self.defend(srcMAC, srcIP)
                         else:
-                            iptable = subprocess.check_output(["iptables", "-A", "INPUT", "-s", srcIP, "-j", "DROP"]).decode('utf-8')
-                            if iptable == "":
-                                print("Blocked external IP " + srcIP + " with iptables")
+                            print("potential brute force attack detected over the internet from " + srcIP + " (" + srcMAC + ")")
+                            location = subprocess.check_output(["geoiplookup", srcIP]).decode('utf-8')
+                            print("traffic coming from " + location)
+                            self.blockIP(srcIP)
+                        self.blacklist.add(srcMAC)
 
     def defend(self, attackerMAC, attackerIP):
-        # macAddress = "ac:37:43:a3:fd:6f" # eric phone
-        # macAddress = "10:08:b1:6f:ef:bb" # robert
-        # macAddress = "b8:e8:56:44:59:c4" # maurya
         self.setMonitorMode()
         routerMAC = self.findRouterMAC()
         self.logNmap(attackerIP)
-        thread = threading.Thread(target=self.spamDeauthPackets, args=[1, routerMAC, attackerMAC, self.monitor])
+        thread = threading.Thread(target=self.spamDeauthPackets, args=[32, routerMAC, attackerMAC, self.monitor])
         thread.start()
         self.sniffProbeRequests(attackerMAC, self.sniffTime)
 
@@ -164,11 +124,11 @@ class Protecc:
 
     def spamDeauthPackets(self, count, routerMAC, attackerMAC, interface):
         while True:
-            subprocess.run(["aireplay-ng", "-0", str(count), "-a", routerMAC, "-c", attackerMAC, interface])
-            time.sleep(1)
+            subprocess.run(["aireplay-ng", "-0", str(count), "-a", routerMAC, "-c", attackerMAC, interface], stdout=subprocess.PIPE)
+            time.sleep(5)
 
     def logNmap(self, ip):
-        subprocess.run(["nmap", "-A", "-oN", self.outputFolder + "/nmap-" + ip + ".log", ip])
+        subprocess.run(["nmap", "-A", "-oN", self.outputFolder + "/nmap-" + ip + ".log", ip], stdout=subprocess.PIPE)
 
     def sniffProbeRequests(self, macAddress, sniffTime):
         subprocess.run("timeout " + str(sniffTime) + "s " \
@@ -176,16 +136,24 @@ class Protecc:
                        "grep --line-buffered " + macAddress + " > " + self.outputFolder + "/filteredSneaks-" + macAddress + ".log", shell=True)
         print("probe sniffing on " + macAddress + " completed")
 
+    def blockIP(self, ip):
+        ret = subprocess.check_output(["iptables", "-A", "INPUT", "-s", ip, "-j", "DROP"]).decode('utf-8')
+        if ret == "":
+            print("blocked external IP (" + ip + ") with iptables")
+
     def sendEmail(self, type, warning):
+        email = ""
+        wordpass = ""
+
         # login to gmail
         server = smtplib.SMTP('smtp.gmail.com', 587)
         server.starttls()
-        server.login("haccingprotecctor@gmail.com", "ishallprotecc")
+        server.login(email, wordpass)
 
         msg = 'Subject: {}\n\n{}'.format("ALERT: {}".format(type), warning)
 
         # for now, sending email to myself
-        server.sendmail("haccingprotecctor@gmail.com", "haccingprotecctor@gmail.com", msg)
+        server.sendmail(email, email, msg)
         server.quit()
 
 DESCRIPTION = "Automated counter attack service for public wifi"
@@ -214,7 +182,6 @@ def main():
 
     thread = threading.Thread(target=doSniff, args=[args.internet_interface, p])
     thread.start()
-    win.mainloop()
 
 
 if __name__ == "__main__":
